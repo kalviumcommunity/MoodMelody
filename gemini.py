@@ -10,42 +10,28 @@ genai.configure(api_key=GOOGLE_API_KEY)
 # Initialize the model
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- MULTI-SHOT PROMPT CONFIGURATION ---
+# --- CHAIN-OF-THOUGHT PROMPT CONFIGURATION ---
 generation_config = {
     "temperature": 0.0,
     "response_mime_type": "application/json",
 }
 
-def convert_text_to_json(raw_text: str) -> dict:
+def solve_word_problem(problem: str) -> dict:
     """
-    Converts unstructured text to a clean JSON object using a multi-shot prompt.
+    Solves a word problem using Chain-of-Thought prompting.
     """
-    # The prompt includes several examples to teach the model the pattern.
-    multi_shot_prompt = f"""
-    Your task is to parse unstructured text and convert it into a structured JSON object.
+    # The prompt explicitly asks the model to break down its reasoning.
+    cot_prompt = f"""
+    Solve the following word problem. First, think step-by-step to explain your reasoning.
+    Then, provide the final answer in a JSON object with two keys: "reasoning" and "final_answer".
 
-    -- EXAMPLE 1 --
-    Input: "User: John Doe, Age: 30, Location: New York"
-    Output: {{"name": "John Doe", "age": 30, "city": "New York"}}
-
-    -- EXAMPLE 2 --
-    Input: "Name is Jane Smith. She is 25 and lives in London."
-    Output: {{"name": "Jane Smith", "age": 25, "city": "London"}}
-
-    -- EXAMPLE 3 --
-    Input: "Age: 45, City: Tokyo, Name: Ken Tanaka"
-    Output: {{"name": "Ken Tanaka", "age": 45, "city": "Tokyo"}}
-    -- END EXAMPLES --
-
-    -- TASK --
-    Input: "{raw_text}"
-    Output:
+    Problem: "{problem}"
     """
     
-    print(f"Sending multi-shot prompt for text: '{raw_text}'")
+    print(f"Sending CoT prompt for problem: '{problem}'")
     
     response = model.generate_content(
-        multi_shot_prompt,
+        cot_prompt,
         generation_config=generation_config
     )
     
@@ -55,7 +41,13 @@ def convert_text_to_json(raw_text: str) -> dict:
         return {"error": "Failed to parse JSON response."}
 
 # --- DEMONSTRATION ---
-unstructured_text = "The client is David Chen from Singapore and he is 50 years old."
-details = convert_text_to_json(unstructured_text)
-print("\n--- Converted JSON ---")
-pprint.pprint(details)
+word_problem = "A coffee shop has 25 tables. 15 of them seat 4 people each, and the rest seat 2 people each. What is the maximum number of people that can be seated in the coffee shop?"
+solution = solve_word_problem(word_problem)
+
+print("\n--- Solved with Chain of Thought ---")
+# We can now display the reasoning and the answer separately.
+print("\nReasoning:")
+print(solution.get("reasoning"))
+
+print("\nFinal Answer:")
+print(solution.get("final_answer"))
