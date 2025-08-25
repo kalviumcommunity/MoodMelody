@@ -1,50 +1,61 @@
 import google.generativeai as genai
 import os
 import json
+import pprint
 
 # Configure your API key
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyDEGBI27sIrVG7xwBYak-RQ-lhw6PTAKNM')
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# --- 1. Define the Python function (our "tool") ---
-def get_weather(location: str, unit: str = "celsius"):
+# Initialize the model
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+# --- MULTI-SHOT PROMPT CONFIGURATION ---
+generation_config = {
+    "temperature": 0.0,
+    "response_mime_type": "application/json",
+}
+
+def convert_text_to_json(raw_text: str) -> dict:
     """
-    A mock function to get the current weather for a given location.
-    In a real app, this would call a weather API.
+    Converts unstructured text to a clean JSON object using a multi-shot prompt.
     """
-    print(f"--- Calling get_weather(location='{location}', unit='{unit}') ---")
-    if "tokyo" in location.lower():
-        return json.dumps({"location": "Tokyo", "temperature": "15", "unit": unit})
-    elif "san francisco" in location.lower():
-        return json.dumps({"location": "San Francisco", "temperature": "20", "unit": unit})
-    else:
-        return json.dumps({"location": location, "temperature": "unknown"})
+    # The prompt includes several examples to teach the model the pattern.
+    multi_shot_prompt = f"""
+    Your task is to parse unstructured text and convert it into a structured JSON object.
 
-# --- 2. Describe the tool to the AI model ---
-model = genai.GenerativeModel(
-    'gemini-1.5-flash',
-    tools=[get_weather]
-)
+    -- EXAMPLE 1 --
+    Input: "User: John Doe, Age: 30, Location: New York"
+    Output: {{"name": "John Doe", "age": 30, "city": "New York"}}
 
-# --- 3. Send a prompt that requires the tool ---
-chat = model.start_chat()
-prompt = "What is the current temperature in San Francisco?"
-print(f"User Prompt: {prompt}")
+    -- EXAMPLE 2 --
+    Input: "Name is Jane Smith. She is 25 and lives in London."
+    Output: {{"name": "Jane Smith", "age": 25, "city": "London"}}
 
-response = chat.send_message(prompt)
+    -- EXAMPLE 3 --
+    Input: "Age: 45, City: Tokyo, Name: Ken Tanaka"
+    Output: {{"name": "Ken Tanaka", "age": 45, "city": "Tokyo"}}
+    -- END EXAMPLES --
 
-# --- 4. Interpret the model's response ---
-function_call = response.candidates[0].content.parts[0].function_call
-print(f"Model wants to call function: {function_call.name}")
-
-# --- THE FIX IS HERE ---
-# Check if function_call.args exists before trying to convert it to a dict.
-args = dict(function_call.args) if function_call.args else {}
-print(f"With arguments: {args}")
-
-# --- 5. Execute the function ---
-if function_call.name == "get_weather":
-    weather_data = get_weather(location=args.get("location"), unit=args.get("unit"))
+    -- TASK --
+    Input: "{raw_text}"
+    Output:
+    """
     
-    print("--- Function Executed. Result: ---")
-    print(weather_data)
+    print(f"Sending multi-shot prompt for text: '{raw_text}'")
+    
+    response = model.generate_content(
+        multi_shot_prompt,
+        generation_config=generation_config
+    )
+    
+    try:
+        return json.loads(response.text)
+    except (json.JSONDecodeError, AttributeError):
+        return {"error": "Failed to parse JSON response."}
+
+# --- DEMONSTRATION ---
+unstructured_text = "The client is David Chen from Singapore and he is 50 years old."
+details = convert_text_to_json(unstructured_text)
+print("\n--- Converted JSON ---")
+pprint.pprint(details)
