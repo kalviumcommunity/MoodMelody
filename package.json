@@ -1,0 +1,23 @@
+{
+  "name": "moodmelody",
+  "version": "1.0.0",
+  "description": "MoodMelody is a user-focused music recommendation system that leverages artificial intelligence to create personalized playlists based on how the user feels. Rather than relying on complex emotion detection algorithms, our first version puts the user in control—just tell us your mood, and we'll find the right music for you!",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kalviumcommunity/MoodMelody.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kalviumcommunity/MoodMelody/issues"
+  },
+  "homepage": "https://github.com/kalviumcommunity/MoodMelody#readme",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1"
+  }
+}
