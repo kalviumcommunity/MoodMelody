@@ -1,79 +1,60 @@
 import google.generativeai as genai
 import os
-import chromadb
-import pprint
+import numpy as np
 
 # Configure your API key
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyDEGBI27sIrVG7xwBYak-RQ-lhw6PTAKNM')
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# --- 1. Set up the Vector Database (ChromaDB) ---
-# Initialize the ChromaDB client (in-memory)
-client = chromadb.Client()
+# --- 1. Implement the Cosine Similarity Function ---
+def cosine_similarity(vec_a, vec_b):
+    """
+    Calculates the cosine similarity between two vectors.
+    """
+    # Ensure the vectors are NumPy arrays
+    vec_a = np.array(vec_a)
+    vec_b = np.array(vec_b)
+    
+    # Calculate the dot product
+    dot_product = np.dot(vec_a, vec_b)
+    
+    # Calculate the magnitude (norm) of each vector
+    norm_a = np.linalg.norm(vec_a)
+    norm_b = np.linalg.norm(vec_b)
+    
+    # Calculate the cosine similarity
+    # Add a small epsilon to avoid division by zero
+    epsilon = 1e-8
+    similarity = dot_product / ((norm_a * norm_b) + epsilon)
+    
+    return similarity
 
-# Create a collection to store our document vectors
-# A collection is like a table in a traditional database.
-collection = client.create_collection(name="document_collection")
-
-print("Vector database collection created.")
-
-# --- 2. Define Documents and Embed Them ---
-# These are the documents we want our AI to be able to search through.
-DOCUMENTS = [
-    "The new AI model from Google is called Gemini.",
-    "The capital of France is Paris, known for the Eiffel Tower.",
-    "ChromaDB is an open-source vector database.",
-    "The Eiffel Tower is a famous landmark in Paris.",
-    "Gemini is a powerful and multimodal AI model."
+# --- 2. Generate Embeddings to Compare ---
+embedding_model = "models/embedding-001"
+texts_to_embed = [
+    "The cat sat on the mat.",            # Text 0
+    "A feline was resting on the rug.",   # Text 1 (Similar to 0)
+    "The weather is sunny today.",        # Text 2 (Unrelated to 0 and 1)
 ]
 
-# Use the Gemini embedding model
-embedding_model = "models/embedding-001"
+print("Generating embeddings...")
 embeddings = genai.embed_content(
     model=embedding_model,
-    content=DOCUMENTS,
-    task_type="RETRIEVAL_DOCUMENT"
+    content=texts_to_embed,
+    task_type="SEMANTIC_SIMILARITY"
 )['embedding']
 
-# --- 3. Add Documents to the Database ---
-# We need to provide the embeddings, the original documents, and unique IDs.
-collection.add(
-    embeddings=embeddings,
-    documents=DOCUMENTS,
-    ids=[f"doc_{i}" for i in range(len(DOCUMENTS))]
-)
-print(f"{len(DOCUMENTS)} documents have been added to the vector database.")
+# --- 3. Calculate and Compare Similarity Scores ---
+# Compare two semantically similar sentences
+similarity_score_1 = cosine_similarity(embeddings[0], embeddings[1])
 
-# --- 4. Query the Database ---
-def query_vector_db(query: str, n_results: int = 2):
-    """
-    Takes a user query, embeds it, and searches the vector database.
-    """
-    print(f"\nSearching for documents similar to: '{query}'")
-    
-    # First, embed the user's query using the same model
-    query_embedding = genai.embed_content(
-        model=embedding_model,
-        content=query,
-        task_type="RETRIEVAL_QUERY"
-    )['embedding']
-    
-    # Now, query the collection to find the most similar documents
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=n_results
-    )
-    
-    return results['documents'][0]
+# Compare two unrelated sentences
+similarity_score_2 = cosine_similarity(embeddings[0], embeddings[2])
 
-# --- DEMONSTRATION ---
-# This query is conceptually similar to documents 0 and 4.
-search_results = query_vector_db("What is the latest AI from Google?")
 
-print("\n--- Top Search Results ---")
-pprint.pprint(search_results)
+print("\n--- Cosine Similarity Results ---")
+print(f"Similarity between '{texts_to_embed[0]}' and '{texts_to_embed[1]}':")
+print(f"Score: {similarity_score_1:.4f} (This should be high)")
 
-# This query is conceptually similar to documents 1 and 3.
-search_results_2 = query_vector_db("Tell me about famous places in France.")
-print("\n--- Top Search Results ---")
-pprint.pprint(search_results_2)
+print(f"\nSimilarity between '{texts_to_embed[0]}' and '{texts_to_embed[2]}':")
+print(f"Score: {similarity_score_2:.4f} (This should be low)")
